@@ -7,7 +7,7 @@
 uint8_t counter = 0;
 static uint8_t databuff = 0;
 static uint8_t commandbuff = 0;
-uint8_t ddram[255];
+uint8_t ddram[128];
 uint8_t ddram_ac;
 bool ddram_change = false;
 
@@ -46,6 +46,9 @@ void execCommand(uint8_t command) {
   }
 }
 void execData(uint8_t data) {
+  Serial.print((char)data);
+  // Serial.print(ddram_ac);
+
   // // Serial.print("Data: ");
   // if (isprint(data)) {
   //   // Serial.println((char)data);
@@ -57,8 +60,8 @@ void execData(uint8_t data) {
   ddram[ddram_ac] = data;
   if (ddram_ac < sizeof(ddram)) {
     ddram_ac++;
-  }else{
-    Serial.print("ERR");
+  } else {
+    // Serial.print("ERR");
   }
   ddram_change = true;
   // printDdram();
@@ -78,7 +81,7 @@ void Control(uint8_t pinSnapshot, uint8_t rs_pin) {
   uint8_t buff = pinSnapshot;
   bool retry = true;
 
-  do {
+  
 
     // ddram_change = false;
     // Serial.print("S:");
@@ -90,11 +93,11 @@ void Control(uint8_t pinSnapshot, uint8_t rs_pin) {
         //Serial.print(rs_pin);
         if (rs_pin) {
           currentState = mode_8bit ? D8 : DH;
-          continue;
+          // continue;
 
         } else {
           currentState = mode_8bit ? C8 : CH;
-          continue;
+          // continue;
         }
         break;
 
@@ -106,7 +109,7 @@ void Control(uint8_t pinSnapshot, uint8_t rs_pin) {
           currentState = DL;
         } else {
           currentState = R;
-          continue;
+          // continue;
         }
 
         break;
@@ -122,7 +125,7 @@ void Control(uint8_t pinSnapshot, uint8_t rs_pin) {
 
         } else {
           currentState = R;
-          continue;
+          // continue;
         }
 
         break;
@@ -133,7 +136,7 @@ void Control(uint8_t pinSnapshot, uint8_t rs_pin) {
           currentState = CL;
         } else {
           currentState = R;
-          continue;
+          // continue;
         }
         break;
 
@@ -144,7 +147,7 @@ void Control(uint8_t pinSnapshot, uint8_t rs_pin) {
           execCommand(commandbuff);
         } else {
           currentState = R;
-          continue;
+          // continue;
         }
 
         break;
@@ -158,7 +161,7 @@ void Control(uint8_t pinSnapshot, uint8_t rs_pin) {
         } else {
           // Serial.print("C8 Err");
           currentState = R;
-          continue;
+          // continue;
         }
         break;
 
@@ -172,13 +175,13 @@ void Control(uint8_t pinSnapshot, uint8_t rs_pin) {
 
           // Serial.print("D8 Err");
           currentState = R;
-          continue;
+          // continue;
         }
 
         break;
     }
     retry = false;
-  } while (retry);
+  
 }
 
 
@@ -226,7 +229,7 @@ void setup() {
 void loop() {
 
   if (ddram_change) {
-    printDdram();
+    // printDdram();
     ddram_change = false;
   }
 }
