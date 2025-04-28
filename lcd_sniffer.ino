@@ -4,16 +4,31 @@
 
 #define COLS 20
 
-
 #define USE_DIRECT_ISR
 
 #include <ctype.h>
+
+#ifndef cbi
+#define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
+#endif
+#ifndef sbi
+#define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
+#endif
+
+#define BUFF_SIZE 256
+
 
 uint8_t counter = 0;
 static uint8_t databuff = 0;
 static uint8_t commandbuff = 0;
 
 
+static volatile struct {
+  uint8_t pinD;
+  uint8_t pinB;
+} circle_buff[BUFF_SIZE];
+static volatile uint8_t wp = 0;
+static volatile uint8_t rp = 0;
 
 uint8_t ddram[80 * 2];
 uint8_t ddram_ac;
@@ -117,7 +132,7 @@ static char fprintable(char in) {
 
 static void printDdram() {
 
-#ifdef DATA_COUNTERS
+#ifdef USE_COUNTERS
   if (1) {
     Serial.print("Ovf: ");
     Serial.println(counters.ddram_overflow_cnt);
@@ -137,6 +152,12 @@ static void printDdram() {
 
     Serial.print("Lastest: ");
     Serial.println(counters.latest_cmd, HEX);
+
+    
+    Serial.print("Wp: ");
+    Serial.println(wp, HEX);
+
+
   }
 #endif
 
@@ -300,15 +321,14 @@ void __attribute__((noinline)) handle_pins(uint8_t pinB, uint8_t pinD) {
     BITMAP(pinB, 4, 7) |  // DB7 → bit 7
     0;
 
-  //pinSnapshot = (PIND & 0b11100000) | (PINB & 0b00011111);  // Read full PINB
   control(a, rs_pin, rw_pin);
 }
 
 
-#ifdef USE_DIRECT_ISR
+#ifdef NO____USE_DIRECT_ISR
 
 // SPI interrupt routine
-ISR(INT0_vect) {
+ISR(INT1_vect) {
 
   uint8_t pinD = PIND;
   uint8_t pinB = PINB;
@@ -317,6 +337,27 @@ ISR(INT0_vect) {
   handle_pins(pinB, pinD);
 
   PORTC &= ~(1 << 0);
+}
+/
+#endif
+
+
+#ifdef USE_DIRECT_ISR
+
+  // SPI interrupt routine
+  ISR(INT1_vect) {
+
+  uint8_t pinD = PIND;
+  uint8_t pinB = PINB;
+
+  PORTC &= ~(1 << 0);
+
+  circle_buff[wp].pinD = pinD;
+  circle_buff[wp].pinB = pinB;
+
+  PORTC |= (1 << 0);
+  wp++;
+  wp = wp % BUFF_SIZE;
 }  // end of interrupt routine SPI_STC_vect
 
 #endif
@@ -359,10 +400,24 @@ void setup() {
 
 
 #ifdef USE_DIRECT_ISR
-  EICRA &= ~(bit(ISC00) | bit(ISC01));  // clear existing flags
-  EICRA |= (1 << ISC00);                // ISC01 = 1, ISC00 = 0 → falling edge
-  EIMSK |= (1 << INT0);
+  EICRA &= ~(bit(ISC11) | bit(ISC10));  // clear existing flags
+  EICRA |= (1 << ISC11);                // ISC01 = 1, ISC00 = 0 → falling edge
+  EIMSK |= (1 << INT1);
 #endif
+
+
+
+  // 	// enable timer 0 overflow interrupt
+  // #if defined(TIMSK) && defined(TOIE0)
+  // 	cbi(TIMSK, TOIE0);
+  // #elif defined(TIMSK0) && defined(TOIE0)
+  // 	cbi(TIMSK0, TOIE0);
+  // #else
+  // 	#error	Timer 0 overflow interrupt not set correctly
+  // #endif
+
+
+
 
   DDRC |= (1 << 0);
   // PORTC |= (1 << 0);
@@ -379,15 +434,23 @@ void setup() {
 }
 
 void loop() {
-
+#if 1
   while (Serial.available() > 0) {
     Serial.read();
     ddram_change = true;
   }
 
+  while (wp != rp) {
+    handle_pins(circle_buff[rp].pinB, circle_buff[rp].pinD);
+    rp++;
+    rp = rp % BUFF_SIZE;
+  }
+
+
   if (ddram_change) {
     ddram_change = false;
-    delay(500);
+    delay(50);
     printDdram();
   }
+#endif
 }
